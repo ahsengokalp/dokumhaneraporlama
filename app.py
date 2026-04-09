@@ -8,7 +8,12 @@ from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
 from analysis_engine import analyze_excel_file
-from ollama_client import ask_ollama, build_manager_prompt
+from ollama_client import (
+    ask_ollama,
+    build_fallback_comment,
+    build_manager_prompt,
+    is_unusable_ai_comment,
+)
 
 load_dotenv()
 
@@ -167,10 +172,11 @@ def analyze():
             prompt = build_manager_prompt(result["summary_for_ai"])
             try:
                 ai_comment = ask_ollama(prompt)
-                ai_comment_html = render_ai_comment_html(ai_comment)
+                if is_unusable_ai_comment(ai_comment, result["summary_for_ai"]):
+                    ai_comment = build_fallback_comment(result["summary_for_ai"])
             except Exception:
-                ai_comment = None
-                ai_comment_html = None
+                ai_comment = build_fallback_comment(result["summary_for_ai"])
+            ai_comment_html = render_ai_comment_html(ai_comment)
 
         return render_template(
             "result.html",

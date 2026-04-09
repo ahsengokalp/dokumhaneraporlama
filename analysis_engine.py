@@ -1,7 +1,10 @@
 import unicodedata
+import warnings
+from decimal import Decimal, ROUND_HALF_UP
 
 import pandas as pd
 import plotly.graph_objects as go
+from openpyxl import load_workbook
 
 
 PLANLAMA_RULES = [
@@ -93,6 +96,95 @@ def to_display_number(value, decimals=1):
     return f"{rounded:.{decimals}f}".rstrip("0").rstrip(".")
 
 
+def decimal_places_from_format(number_format):
+    if not number_format:
+        return 0
+
+    format_text = str(number_format).split(";")[0]
+    if "." not in format_text:
+        return 0
+
+    decimal_part = format_text.split(".", 1)[1]
+    return sum(1 for char in decimal_part if char in {"0", "#"})
+
+
+def quantize_decimal(value, decimals):
+    quantizer = Decimal("1") if decimals <= 0 else Decimal(f"1.{'0' * decimals}")
+    return Decimal(str(value)).quantize(quantizer, rounding=ROUND_HALF_UP)
+
+
+def format_excel_cell_value(value, number_format, parametre=None):
+    if value is None or pd.isna(value):
+        return None
+
+    format_text = str(number_format or "").split(";")[0]
+    decimals = decimal_places_from_format(format_text)
+
+    if "%" in format_text:
+        percent_value = quantize_decimal(float(value) * 100, decimals)
+        return f"{percent_value:.{decimals}f}%" if decimals > 0 else f"{int(percent_value)}%"
+
+    unit = infer_unit(parametre) if parametre else None
+
+    if any(token in format_text for token in ("0", "#")):
+        numeric_value = quantize_decimal(float(value), decimals)
+        display_value = f"{numeric_value:.{decimals}f}" if decimals > 0 else str(int(numeric_value))
+        if unit == "T":
+            return f"{display_value}T"
+        if unit == "kg":
+            return f"{display_value} kg"
+        if unit == "adet":
+            return f"{display_value} adet"
+        return display_value
+
+    return str(value)
+
+
+def build_excel_display_map(filepath, sheet_name="Veriler"):
+    display_map = {}
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="Data Validation extension is not supported and will be removed",
+        )
+        workbook = load_workbook(filepath, data_only=True)
+
+    try:
+        worksheet = workbook[sheet_name]
+        headers = [cell.value for cell in worksheet[1]]
+        date_columns = []
+
+        for column_index, header_value in enumerate(headers[2:], start=3):
+            parsed = pd.to_datetime(header_value, errors="coerce")
+            if not pd.isna(parsed):
+                date_columns.append((column_index, pd.Timestamp(parsed).normalize()))
+
+        for row in worksheet.iter_rows(min_row=2):
+            kategori = row[0].value
+            parametre = row[1].value
+            if kategori is None or parametre is None:
+                continue
+
+            kategori_key = normalize_label(kategori)
+            parametre_key = normalize_label(parametre)
+
+            for column_index, tarih in date_columns:
+                cell = worksheet.cell(row=row[0].row, column=column_index)
+                if cell.value is None:
+                    continue
+
+                display_value = format_excel_cell_value(cell.value, cell.number_format, parametre)
+                if display_value is None:
+                    continue
+
+                display_map[(kategori_key, parametre_key, tarih)] = display_value
+    finally:
+        workbook.close()
+
+    return display_map
+
+
 def format_metric_value(value, parametre):
     if pd.isna(value):
         return "-"
@@ -112,11 +204,13 @@ def format_metric_value(value, parametre):
     return display_value
 
 
-def format_comparison(value, target, parametre):
+def format_comparison(value, target, parametre, value_display=None, target_display=None):
     if pd.isna(value) or pd.isna(target):
         return None
     operator = ">" if float(value) > float(target) else "<" if float(value) < float(target) else "="
-    return f"{format_metric_value(value, parametre)} {operator} {format_metric_value(target, parametre)}"
+    left_text = value_display or format_metric_value(value, parametre)
+    right_text = target_display or format_metric_value(target, parametre)
+    return f"{left_text} {operator} {right_text}"
 
 
 def prepare_dataframe(df):
@@ -152,6 +246,21 @@ def prepare_dataframe(df):
     return melted
 
 
+def enrich_with_excel_display(df, display_map):
+    enriched = df.copy()
+    enriched["DegerGosterimExcel"] = [
+        display_map.get(
+            (
+                normalize_label(kategori),
+                normalize_label(parametre),
+                pd.Timestamp(tarih).normalize(),
+            )
+        )
+        for kategori, parametre, tarih in zip(enriched["Kategori"], enriched["Parametre"], enriched["Tarih"])
+    ]
+    return enriched
+
+
 def clean_base_name(parametre):
     value = str(parametre).strip()
     lowered = value.lower()
@@ -180,8 +289,15 @@ def attach_targets(df):
     target_df = temp[is_target].copy()
     actual_df = temp[~is_target].copy()
 
-    target_df = target_df.rename(columns={"Deger": "Hedef"})
-    target_df = target_df[["KategoriKey", "BaseKey", "Tarih", "Hedef"]]
+    rename_map = {"Deger": "Hedef"}
+    if "DegerGosterimExcel" in target_df.columns:
+        rename_map["DegerGosterimExcel"] = "HedefGosterimExcel"
+    target_df = target_df.rename(columns=rename_map)
+
+    target_columns = ["KategoriKey", "BaseKey", "Tarih", "Hedef"]
+    if "HedefGosterimExcel" in target_df.columns:
+        target_columns.append("HedefGosterimExcel")
+    target_df = target_df[target_columns]
 
     actual_df = actual_df.merge(
         target_df,
@@ -215,11 +331,27 @@ def build_action_payload(
 ):
     hedef = row.get("Hedef")
     deger = row["Deger"]
+    deger_gosterim = row.get("DegerGosterimExcel") or format_metric_value(deger, row["Parametre"])
+    hedef_gosterim = None
+    if not pd.isna(hedef):
+        hedef_gosterim = row.get("HedefGosterimExcel") or format_metric_value(hedef, row["Parametre"])
 
     if comparison_value is None:
-        comparison_text = format_comparison(deger, hedef, row["Parametre"])
+        comparison_text = format_comparison(
+            deger,
+            hedef,
+            row["Parametre"],
+            value_display=deger_gosterim,
+            target_display=hedef_gosterim,
+        )
     else:
-        comparison_text = format_comparison(deger, comparison_value, row["Parametre"])
+        comparison_text = format_comparison(
+            deger,
+            comparison_value,
+            row["Parametre"],
+            value_display=deger_gosterim,
+            target_display=format_metric_value(comparison_value, row["Parametre"]),
+        )
 
     return {
         "inceleme_gunu": str(day.date()),
@@ -231,8 +363,8 @@ def build_action_payload(
         "relation_label": relation_label,
         "deger": deger,
         "hedef": hedef if not pd.isna(hedef) else None,
-        "deger_gosterim": format_metric_value(deger, row["Parametre"]),
-        "hedef_gosterim": format_metric_value(hedef, row["Parametre"]) if not pd.isna(hedef) else None,
+        "deger_gosterim": deger_gosterim,
+        "hedef_gosterim": hedef_gosterim,
         "karsilastirma": comparison_text,
         "yorum": yorum,
     }
@@ -392,6 +524,10 @@ def build_parameter_summaries(df):
         latest_row = group.iloc[-1]
         latest_target = group["Hedef"].dropna()
         target_value = latest_target.iloc[-1] if not latest_target.empty else None
+        latest_value_display = latest_row.get("DegerGosterimExcel") or format_metric_value(latest_row["Deger"], parametre)
+        latest_target_display = latest_row.get("HedefGosterimExcel") or (
+            format_metric_value(target_value, parametre) if target_value is not None else None
+        )
 
         summaries.append(
             {
@@ -400,7 +536,7 @@ def build_parameter_summaries(df):
                 "parametre": parametre,
                 "son_tarih": str(latest_row["Tarih"].date()),
                 "guncel_deger": latest_row["Deger"],
-                "guncel_deger_gosterim": format_metric_value(latest_row["Deger"], parametre),
+                "guncel_deger_gosterim": latest_value_display,
                 "ortalama": group["Deger"].mean(),
                 "ortalama_gosterim": format_metric_value(group["Deger"].mean(), parametre),
                 "maksimum": group["Deger"].max(),
@@ -408,8 +544,16 @@ def build_parameter_summaries(df):
                 "minimum": group["Deger"].min(),
                 "minimum_gosterim": format_metric_value(group["Deger"].min(), parametre),
                 "hedef": target_value,
-                "hedef_gosterim": format_metric_value(target_value, parametre) if target_value is not None else None,
-                "karsilastirma": format_comparison(latest_row["Deger"], target_value, parametre) if target_value is not None else None,
+                "hedef_gosterim": latest_target_display,
+                "karsilastirma": format_comparison(
+                    latest_row["Deger"],
+                    target_value,
+                    parametre,
+                    value_display=latest_value_display,
+                    target_display=latest_target_display,
+                )
+                if target_value is not None
+                else None,
             }
         )
 
@@ -498,8 +642,10 @@ def create_charts(df):
 
 
 def analyze_excel_file(filepath):
+    excel_display_map = build_excel_display_map(filepath, sheet_name="Veriler")
     raw_df = pd.read_excel(filepath, sheet_name="Veriler")
     df = prepare_dataframe(raw_df)
+    df = enrich_with_excel_display(df, excel_display_map)
     df = attach_targets(df)
 
     charts = create_charts(df)
