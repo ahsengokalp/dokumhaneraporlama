@@ -77,7 +77,7 @@
                         <div class="manual-section-head">
                             <div>
                                 <h3>Veri satirlari</h3>
-                                <p>Kategori ve parametre gir, tarih bazli degerleri doldur. Tablo alanini fareyle tutup saga sola ya da asagi yukari kaydirabilirsin.</p>
+                                <p>Tablodaki satirlar sabittir. Sadece tarih bazli degerleri doldur; kategori ve parametreler her zaman ayni duzende kalir.</p>
                             </div>
                         </div>
                         <div class="manual-table-wrap" id="manual-table-wrap">
@@ -86,17 +86,12 @@
                                     <tr>
                                         <th>Kategori</th>
                                         <th>Parametre</th>
-                                        <th class="manual-date-head">Degerler</th>
-                                        <th>Satir</th>
                                     </tr>
                                 </thead>
                                 <tbody id="manual-table-body"></tbody>
                             </table>
                         </div>
-                        <div class="manual-table-actions">
-                            <button class="button-secondary" type="button" id="add-row-button">Satir ekle</button>
-                        </div>
-                        <p class="manual-hint">Yuzdeli parametrelerde `4` girersen sistem bunu `%4` olarak kaydeder.</p>
+                        <p class="manual-hint">Yuzdeli parametrelerde `4` girersen sistem bunu `%4` olarak kaydeder. Tablo alanini fareyle tutup saga sola ya da asagi yukari kaydirabilirsin.</p>
                     </section>
 
                     <div class="landing-actions landing-actions--inline">
@@ -109,7 +104,7 @@
             <article class="entry-panel entry-panel--history">
                 <div class="entry-panel-head">
                     <div>
-                        <h2>Kayitli veri setleri</h2>
+                        <h2>Kayitli tablolar</h2>
                         <p>Daha once kaydettigin manuel girisleri burada gorup forma geri yukleyebilirsin.</p>
                         {% if manual_history_error %}
                             <p class="entry-panel-note entry-panel-note--warning">{{ manual_history_error }}</p>
@@ -126,7 +121,7 @@
                                 <div class="history-copy">
                                     <div class="history-title-row">
                                         <h3>{{ record.display_name }}</h3>
-                                        <span class="history-badge">{{ record.row_count }} satir</span>
+                                        <span class="history-badge">{{ record.row_count }} dolu satir</span>
                                     </div>
                                     <p class="history-meta">{{ record.date_range_label }} | {{ record.filled_value_count }} deger</p>
                                 </div>
@@ -149,7 +144,7 @@
                     </div>
                 {% endif %}
                 {% if not manual_history_error %}
-                    <div class="empty-state empty-state--inline" id="history-empty-state" {% if manual_history %}hidden{% endif %}>Henuz kayitli manuel veri seti yok.</div>
+                    <div class="empty-state empty-state--inline" id="history-empty-state" {% if manual_history %}hidden{% endif %}>Henuz kayitli tablo yok.</div>
                 {% endif %}
             </article>
         </div>
@@ -168,7 +163,6 @@
         const generateRangeButton = document.getElementById("generate-range-button");
         const addDateButton = document.getElementById("add-date-button");
         const clearDatesButton = document.getElementById("clear-dates-button");
-        const addRowButton = document.getElementById("add-row-button");
         const manualDateList = document.getElementById("manual-date-list");
         const manualTableWrap = document.getElementById("manual-table-wrap");
         const manualTableBody = document.getElementById("manual-table-body");
@@ -178,11 +172,10 @@
         const loadSubmissionButtons = Array.from(document.querySelectorAll("[data-load-submission]"));
         const deleteSubmissionButtons = Array.from(document.querySelectorAll("[data-delete-submission]"));
 
-        const categoryOptions = {{ template_categories|tojson }};
-        const parameterOptionsByCategory = {{ template_parameters|tojson }};
+        const templateRows = {{ template_rows|tojson }};
         let manualDateCounter = 0;
-        let manualRowCounter = 0;
         let manualDragState = null;
+        let manualSubmitInProgress = false;
 
         function formatDateLabel(value) {
             if (!value) return "Tarih sec";
@@ -236,6 +229,12 @@
             setInlineStatus(uploadStatus, message, tone);
         }
 
+        function resetManualSubmitState() {
+            manualSubmitInProgress = false;
+            manualSubmitButton.disabled = false;
+            manualSubmitButton.textContent = "Analiz et ve kaydet";
+        }
+
         function syncHistoryEmptyState() {
             if (!historyStack || !historyEmptyState) return;
             historyEmptyState.hidden = historyStack.children.length > 0;
@@ -254,7 +253,6 @@
             const parameterText = parameterInput ? parameterInput.value : "";
             const placeholder = parameterText.includes("%") ? "4" : "Deger";
 
-            const actionCell = row.querySelector(".manual-action-cell");
             dateEntries.forEach((entry) => {
                 const cell = document.createElement("td");
                 cell.className = "manual-date-cell";
@@ -267,7 +265,7 @@
                 input.value = existingValues[entry.id] || "";
 
                 cell.appendChild(input);
-                row.insertBefore(cell, actionCell);
+                row.appendChild(cell);
             });
         }
 
@@ -276,13 +274,12 @@
             headRow.querySelectorAll(".manual-date-head").forEach((cell) => cell.remove());
 
             const dateEntries = getDateEntries();
-            const actionHead = headRow.lastElementChild;
 
             if (!dateEntries.length) {
                 const emptyHead = document.createElement("th");
                 emptyHead.className = "manual-date-head";
                 emptyHead.textContent = "Degerler";
-                headRow.insertBefore(emptyHead, actionHead);
+                headRow.appendChild(emptyHead);
             } else {
                 dateEntries.forEach((entry) => {
                     const headCell = document.createElement("th");
@@ -306,7 +303,7 @@
 
                     headContent.append(headLabel, removeButton);
                     headCell.appendChild(headContent);
-                    headRow.insertBefore(headCell, actionHead);
+                    headRow.appendChild(headCell);
                 });
             }
         }
@@ -331,17 +328,6 @@
 
         function clearManualRows() {
             manualTableBody.innerHTML = "";
-        }
-
-        function appendMissingOption(select, value) {
-            if (!select || !value) return;
-            const hasOption = Array.from(select.options).some((option) => option.value === value);
-            if (hasOption) return;
-
-            const option = document.createElement("option");
-            option.value = value;
-            option.textContent = value;
-            select.appendChild(option);
         }
 
         function createDateItem(value = "") {
@@ -409,105 +395,52 @@
             }
         }
 
-        function createCategorySelect(selectedValue = "") {
-            const select = document.createElement("select");
-            select.className = "field-input field-input--table";
-            select.dataset.field = "category";
-
-            const emptyOption = document.createElement("option");
-            emptyOption.value = "";
-            emptyOption.textContent = "Kategori sec";
-            select.appendChild(emptyOption);
-
-            categoryOptions.forEach((optionValue) => {
-                const option = document.createElement("option");
-                option.value = optionValue;
-                option.textContent = optionValue;
-                if (optionValue === selectedValue) {
-                    option.selected = true;
-                }
-                select.appendChild(option);
-            });
-
-            appendMissingOption(select, selectedValue);
-            if (selectedValue) {
-                select.value = selectedValue;
-            }
-
-            return select;
-        }
-
-        function createParameterSelect() {
-            const select = document.createElement("select");
-            select.className = "field-input field-input--table";
-            select.dataset.field = "parameter";
-            return select;
-        }
-
-        function fillParameterOptions(select, category, selectedValue = "") {
-            select.innerHTML = "";
-
-            const emptyOption = document.createElement("option");
-            emptyOption.value = "";
-            emptyOption.textContent = category ? "Parametre sec" : "Once kategori sec";
-            select.appendChild(emptyOption);
-
-            const options = parameterOptionsByCategory[category] || [];
-            options.forEach((optionValue) => {
-                const option = document.createElement("option");
-                option.value = optionValue;
-                option.textContent = optionValue;
-                if (optionValue === selectedValue) {
-                    option.selected = true;
-                }
-                select.appendChild(option);
-            });
-
-            appendMissingOption(select, selectedValue);
-            if (selectedValue) {
-                select.value = selectedValue;
-            }
-        }
-
         function createRow(defaults = {}) {
-            manualRowCounter += 1;
-
             const row = document.createElement("tr");
             row.dataset.rowItem = "true";
-            row.dataset.rowId = `row-${manualRowCounter}`;
+            row.dataset.rowKey = `${defaults.category || ""}|||${defaults.parameter || ""}`;
 
             const categoryCell = document.createElement("td");
-            const categorySelect = createCategorySelect(defaults.category || "");
-            categoryCell.appendChild(categorySelect);
+            categoryCell.className = "manual-fixed-cell";
+            categoryCell.textContent = defaults.category || "-";
+
+            const categoryInput = document.createElement("input");
+            categoryInput.type = "hidden";
+            categoryInput.dataset.field = "category";
+            categoryInput.value = defaults.category || "";
+            categoryCell.appendChild(categoryInput);
 
             const parameterCell = document.createElement("td");
-            const parameterSelect = createParameterSelect();
-            fillParameterOptions(parameterSelect, defaults.category || "", defaults.parameter || "");
-            parameterSelect.addEventListener("change", () => renderRowDateCells(row));
-            parameterCell.appendChild(parameterSelect);
+            parameterCell.className = "manual-fixed-cell";
+            parameterCell.textContent = defaults.parameter || "-";
 
-            const actionCell = document.createElement("td");
-            actionCell.className = "manual-action-cell";
+            const parameterInput = document.createElement("input");
+            parameterInput.type = "hidden";
+            parameterInput.dataset.field = "parameter";
+            parameterInput.value = defaults.parameter || "";
+            parameterCell.appendChild(parameterInput);
 
-            const removeButton = document.createElement("button");
-            removeButton.type = "button";
-            removeButton.className = "icon-button icon-button--danger";
-            removeButton.textContent = "Satiri sil";
-            removeButton.addEventListener("click", () => row.remove());
-            actionCell.appendChild(removeButton);
-
-            categorySelect.addEventListener("change", () => {
-                fillParameterOptions(parameterSelect, categorySelect.value, "");
-                renderRowDateCells(row);
-            });
-
-            row.append(categoryCell, parameterCell, actionCell);
+            row.append(categoryCell, parameterCell);
             manualTableBody.appendChild(row);
             renderRowDateCells(row);
 
             if (defaults.values) {
                 applyValuesToRow(row, defaults.values);
             }
+        }
+
+        function createTemplateRows(valueRows = []) {
+            const valueMap = new Map(
+                valueRows.map((row) => [`${row.category || ""}|||${row.parameter || ""}`, row.values || {}]),
+            );
+
+            templateRows.forEach((templateRow) => {
+                createRow({
+                    category: templateRow.category,
+                    parameter: templateRow.parameter,
+                    values: valueMap.get(`${templateRow.category}|||${templateRow.parameter}`) || {},
+                });
+            });
         }
 
         function applyValuesToRow(row, values = {}) {
@@ -545,8 +478,7 @@
         function hasManualFormContent() {
             const hasDates = getDateEntries().some((entry) => entry.value);
             const hasRows = getManualRows().some((row) => {
-                const hasValues = Object.values(row.values).some((value) => String(value || "").trim());
-                return row.category || row.parameter || hasValues;
+                return Object.values(row.values).some((value) => String(value || "").trim());
             });
             return hasDates || hasRows;
         }
@@ -567,8 +499,7 @@
             }
 
             const hasAnyContent = getManualRows().some((row) => {
-                const hasValues = Object.values(row.values).some((value) => String(value || "").trim());
-                return row.category || row.parameter || hasValues;
+                return Object.values(row.values).some((value) => String(value || "").trim());
             });
 
             if (!hasAnyContent) {
@@ -593,20 +524,9 @@
             } else {
                 rangeStartInput.value = "";
                 rangeEndInput.value = "";
-                refreshManualTable();
             }
 
-            rows.forEach((row) => {
-                createRow({
-                    category: row.category || "",
-                    parameter: row.parameter || "",
-                    values: row.values || {},
-                });
-            });
-
-            if (!rows.length) {
-                createRow({});
-            }
+            createTemplateRows(rows);
 
             refreshManualTable();
             if (showHistoryMessage) {
@@ -692,13 +612,12 @@
             setUploadStatus("");
         });
 
-        addRowButton.addEventListener("click", () => {
-            createRow({});
-            setHistoryStatus("");
-            setUploadStatus("");
-        });
-
         manualForm.addEventListener("submit", (event) => {
+            if (manualSubmitInProgress) {
+                event.preventDefault();
+                return;
+            }
+
             if (!validateManualForm()) {
                 event.preventDefault();
                 return;
@@ -709,8 +628,13 @@
                 rows: getManualRows(),
             });
 
+            manualSubmitInProgress = true;
             manualSubmitButton.disabled = true;
             manualSubmitButton.textContent = "Analiz hazirlaniyor...";
+        });
+
+        window.addEventListener("pageshow", () => {
+            resetManualSubmitState();
         });
 
         loadSubmissionButtons.forEach((button) => {
@@ -826,7 +750,7 @@
         rangeStartInput.value = toDateInputValue(yesterday);
         rangeEndInput.value = toDateInputValue(today);
         createDateRange(rangeStartInput.value, rangeEndInput.value);
-        createRow({});
+        createTemplateRows();
         refreshManualTable();
         syncHistoryEmptyState();
     </script>

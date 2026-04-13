@@ -161,6 +161,7 @@ def load_manual_template_config():
         "categories": [],
         "parameters_by_category": {},
         "row_index_map": {},
+        "ordered_rows": [],
         "date_column_count": 0,
     }
 
@@ -174,6 +175,7 @@ def load_manual_template_config():
     categories = []
     parameters_by_category = {}
     row_index_map = {}
+    ordered_rows = []
 
     for row_index in range(2, worksheet.max_row + 1):
         category = worksheet.cell(row=row_index, column=1).value
@@ -188,11 +190,18 @@ def load_manual_template_config():
             categories.append(category_text)
         parameters_by_category.setdefault(category_text, []).append(parameter_text)
         row_index_map[(category_text, parameter_text)] = row_index
+        ordered_rows.append(
+            {
+                "category": category_text,
+                "parameter": parameter_text,
+            }
+        )
 
     workbook.close()
     config["categories"] = categories
     config["parameters_by_category"] = parameters_by_category
     config["row_index_map"] = row_index_map
+    config["ordered_rows"] = ordered_rows
     return config
 
 
@@ -351,8 +360,8 @@ def build_manual_dataframe(payload_text):
         if not isinstance(values, dict):
             values = {}
 
-        has_any_input = category or parameter or any(str(item or "").strip() for item in values.values())
-        if not has_any_input:
+        has_any_value_input = any(str(item or "").strip() for item in values.values())
+        if not has_any_value_input:
             continue
 
         if not category or not parameter:
@@ -430,6 +439,7 @@ def home():
         "index.html",
         template_categories=MANUAL_TEMPLATE_CONFIG["categories"],
         template_parameters=MANUAL_TEMPLATE_CONFIG["parameters_by_category"],
+        template_rows=MANUAL_TEMPLATE_CONFIG["ordered_rows"],
         template_name=os.path.basename(MANUAL_TEMPLATE_CONFIG["path"]) if MANUAL_TEMPLATE_CONFIG["path"] else None,
         manual_history=history_result.get("records", []),
         manual_history_error=None if history_result.get("ok") else history_result.get("message"),

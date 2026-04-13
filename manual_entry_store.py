@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 from datetime import date
@@ -51,6 +52,7 @@ def _ensure_tables(connection):
                 source_kind TEXT NOT NULL,
                 template_name TEXT,
                 submission_name TEXT,
+                submission_hash TEXT,
                 date_start DATE,
                 date_end DATE,
                 row_count INTEGER NOT NULL,
@@ -65,6 +67,18 @@ def _ensure_tables(connection):
             """
             ALTER TABLE manual_data_submissions
             ADD COLUMN IF NOT EXISTS submission_name TEXT
+            """
+        )
+        cursor.execute(
+            """
+            ALTER TABLE manual_data_submissions
+            ADD COLUMN IF NOT EXISTS submission_hash TEXT
+            """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_manual_data_submissions_hash
+            ON manual_data_submissions (submission_hash, created_at DESC)
             """
         )
         cursor.execute(
@@ -115,6 +129,8 @@ def save_manual_submission(raw_df, payload_text, submission_name, template_name=
         }
 
     payload = json.loads(payload_text)
+    normalized_payload_text = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    submission_hash = hashlib.sha256(normalized_payload_text.encode("utf-8")).hexdigest()
     date_columns = list(raw_df.columns[2:])
     filled_value_count = int(raw_df[date_columns].count().sum()) if date_columns else 0
     submission_id = uuid4()
@@ -146,11 +162,35 @@ def save_manual_submission(raw_df, payload_text, submission_name, template_name=
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
+                    SELECT id
+                    FROM manual_data_submissions
+                    WHERE source_kind = %s
+                      AND submission_hash = %s
+                      AND created_at >= NOW() - INTERVAL '15 seconds'
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                    """,
+                    ("manual_form", submission_hash),
+                )
+                existing_row = cursor.fetchone()
+                if existing_row:
+                    return {
+                        "ok": True,
+                        "message": "Ayni veri zaten az once kaydedildi; mevcut kayit kullanildi.",
+                        "submission_id": str(existing_row[0]),
+                        "row_count": int(len(raw_df)),
+                        "value_count": filled_value_count,
+                        "duplicate": True,
+                    }
+
+                cursor.execute(
+                    """
                     INSERT INTO manual_data_submissions (
                         id,
                         source_kind,
                         template_name,
                         submission_name,
+                        submission_hash,
                         date_start,
                         date_end,
                         row_count,
@@ -159,13 +199,14 @@ def save_manual_submission(raw_df, payload_text, submission_name, template_name=
                         operational_day,
                         planlama_day
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         submission_id,
                         "manual_form",
                         template_name,
                         submission_name,
+                        submission_hash,
                         pd.to_datetime(date_columns[0]).date() if date_columns else None,
                         pd.to_datetime(date_columns[-1]).date() if date_columns else None,
                         int(len(raw_df)),
@@ -339,7 +380,7 @@ def get_manual_submission_payload(submission_id):
             "message": "Kayit bulunamadi.",
         }
 
-    payload = row[2]
+    payload = row[3]
     if isinstance(payload, str):
         payload = json.loads(payload)
 

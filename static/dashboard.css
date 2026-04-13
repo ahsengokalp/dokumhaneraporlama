@@ -1666,16 +1666,18 @@ a {
     position: sticky;
     left: 0;
     z-index: 4;
-    min-width: 170px;
+    min-width: 140px;
+    max-width: 140px;
     background: #fff;
 }
 
 .manual-table th:nth-child(2),
 .manual-table td:nth-child(2) {
     position: sticky;
-    left: 170px;
+    left: 140px;
     z-index: 4;
-    min-width: 280px;
+    min-width: 220px;
+    max-width: 220px;
     background: #fff;
 }
 
@@ -1683,22 +1685,6 @@ a {
 .manual-table th:nth-child(2) {
     background: #f8fafc;
     z-index: 7;
-}
-
-.manual-table th:last-child,
-.manual-table td:last-child {
-    position: sticky;
-    right: 0;
-    background: #fff;
-}
-
-.manual-table th:last-child {
-    z-index: 7;
-    background: #f8fafc;
-}
-
-.manual-table td:last-child {
-    z-index: 4;
 }
 
 .manual-table tr:last-child td {
@@ -1709,13 +1695,14 @@ a {
     min-width: 136px;
 }
 
-.manual-action-cell {
-    width: 120px;
-    white-space: nowrap;
-}
-
 .manual-table .field-input--table {
     min-width: 100%;
+}
+
+.manual-fixed-cell {
+    font-weight: 600;
+    color: #2f4661;
+    line-height: 1.4;
 }
 
 .manual-hint {
