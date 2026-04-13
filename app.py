@@ -7,10 +7,11 @@ from datetime import date, datetime
 import pandas as pd
 from flask import Flask, render_template, request
 from flask import abort, send_from_directory
+from openpyxl import load_workbook
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
-from analysis_engine import analyze_excel_file, analyze_raw_dataframe
+from analysis_engine import analyze_excel_file, analyze_raw_dataframe, infer_unit
 from ollama_client import (
     ask_ollama,
     build_fallback_comment,
@@ -134,7 +135,7 @@ def render_ai_comment_html(text):
     return "".join(parts)
 
 
-def normalize_manual_number(value):
+def normalize_manual_number(value, parametre=None):
     if value is None:
         return None
 
@@ -152,9 +153,14 @@ def normalize_manual_number(value):
         text = text.replace(",", ".")
 
     try:
-        return float(text)
+        numeric_value = float(text)
     except ValueError as exc:
         raise ValueError(f"Gecersiz sayisal deger: {value}") from exc
+
+    if infer_unit(parametre) == "%":
+        return numeric_value / 100
+
+    return numeric_value
 
 
 def build_manual_dataframe(payload_text):
@@ -211,7 +217,7 @@ def build_manual_dataframe(payload_text):
         filled_value_count = 0
 
         for date_key in normalized_date_keys:
-            parsed_value = normalize_manual_number(values.get(date_key))
+            parsed_value = normalize_manual_number(values.get(date_key), parameter)
             record[date_key] = parsed_value
             if parsed_value is not None:
                 filled_value_count += 1
@@ -239,7 +245,39 @@ def create_generated_excel(raw_df, preferred_name=None):
         filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         duplicate_index += 1
 
-    raw_df.to_excel(filepath, sheet_name="Veriler", index=False)
+    export_df = raw_df.copy()
+    renamed_columns = []
+    for column in export_df.columns:
+        if column in {"Kategori", "Parametre"}:
+            renamed_columns.append(column)
+            continue
+
+        parsed = pd.to_datetime(column, errors="coerce")
+        renamed_columns.append(parsed.to_pydatetime() if not pd.isna(parsed) else column)
+
+    export_df.columns = renamed_columns
+    export_df.to_excel(filepath, sheet_name="Veriler", index=False)
+
+    workbook = load_workbook(filepath)
+    worksheet = workbook["Veriler"]
+
+    for column_index in range(3, worksheet.max_column + 1):
+        worksheet.cell(row=1, column=column_index).number_format = "dd.mm.yyyy"
+
+    for row_index in range(2, worksheet.max_row + 1):
+        unit = infer_unit(worksheet.cell(row=row_index, column=2).value)
+        if unit == "%":
+            number_format = "0.0%"
+        else:
+            number_format = "#,##0.##"
+
+        for column_index in range(3, worksheet.max_column + 1):
+            cell = worksheet.cell(row=row_index, column=column_index)
+            if cell.value is not None:
+                cell.number_format = number_format
+
+    workbook.save(filepath)
+    workbook.close()
     return filename, filepath
 
 

@@ -4,6 +4,9 @@
 {% block topbar_title %}Toplanti Sonuclari{% endblock %}
 
 {% block top_actions %}
+    {% if generated_filename %}
+        <a class="nav-chip nav-chip--solid" href="{{ url_for('download_file', filename=generated_filename) }}">Olusan Exceli indir</a>
+    {% endif %}
     <a class="nav-chip nav-chip--solid" href="/">Yeni Dosya</a>
 {% endblock %}
 
@@ -14,6 +17,9 @@
             <div class="hero-title-row">
                 <h1 class="hero-title">Sabah Toplanti Raporu</h1>
                 <div class="hero-pills hero-pills--inline">
+                    {% if source_name %}
+                        <span class="hero-pill">{{ source_kind }}: {{ source_name }}</span>
+                    {% endif %}
                     <span class="hero-pill">ISG / Kalite / Uretim: {{ operational_day }}</span>
                     <span class="hero-pill">Planlama: {{ planlama_day }}</span>
                     <span class="hero-pill">{% if ai_comment %}AI ozet hazir{% else %}AI ozet yok{% endif %}</span>
@@ -147,6 +153,9 @@
                             <strong>{% if ai_comment %}Hazir{% else %}Yok{% endif %}</strong>
                         </div>
                     </div>
+                    {% if generated_filename %}
+                        <div class="notice-panel notice-panel--ai">Bu rapor manuel giristen uretildi. Istersen ayni yapidaki Excel dosyasini indirip tekrar kullanabilirsin.</div>
+                    {% endif %}
                     <div class="notice-panel accent-panel">{{ info_text }}</div>
                 </div>
             </article>

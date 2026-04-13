@@ -5,34 +5,102 @@
 {% block top_actions %}{% endblock %}
 
 {% block content %}
-    <section class="landing-shell">
-        <article class="landing-card">
-            <div class="landing-copy">
-                <span class="landing-kicker">Excel Yukleme</span>
-                <h1 class="landing-title">Sabah toplanti analizi</h1>
-                <p class="landing-text">Tek bir Excel dosyasi yukleyin. Sistem toplanti icin ozet, cikarim ve grafikleri hazirlasin.</p>
-                <div class="landing-tags">
-                    <span class="landing-tag">Veriler sayfasi</span>
-                    <span class="landing-tag">Kategori + Parametre</span>
-                    <span class="landing-tag">Tarih kolonlari</span>
-                    <span class="landing-tag">.xlsx / .xls</span>
+    <section class="landing-shell landing-shell--workspace">
+        <div class="landing-grid">
+            <article class="landing-card landing-card--compact">
+                <div class="landing-copy">
+                    <span class="landing-kicker">Excel Yukleme</span>
+                    <h1 class="landing-title landing-title--compact">Hazir dosyayi yukle</h1>
+                    <p class="landing-text">Mevcut akisi koru. Tek bir Excel dosyasi yukleyip analizi hemen baslat.</p>
+                    <div class="landing-tags">
+                        <span class="landing-tag">Veriler sayfasi</span>
+                        <span class="landing-tag">Kategori + Parametre</span>
+                        <span class="landing-tag">Tarih kolonlari</span>
+                        <span class="landing-tag">.xlsx / .xls</span>
+                    </div>
                 </div>
-            </div>
 
-            <form class="upload-form upload-form--landing" action="/analyze" method="post" enctype="multipart/form-data" id="upload-form">
-                <input class="file-input" id="file" type="file" name="file" accept=".xlsx,.xls" required>
-                <label class="file-drop file-drop--landing" for="file">
-                    <span class="file-drop-badge">XL</span>
-                    <span class="file-drop-title">Excel dosyasini sec</span>
-                    <span class="file-name" id="file-name">Henuz dosya secilmedi.</span>
-                    <span class="helper-text">Desteklenen bicimler: .xlsx ve .xls</span>
-                </label>
-                <div class="landing-actions">
-                    <button class="button-primary button-primary--wide" id="submit-button" type="submit">Analizi baslat</button>
-                    <p class="landing-note">Ilk iki sutun `Kategori` ve `Parametre` olmali.</p>
+                <form class="upload-form upload-form--landing" action="/analyze" method="post" enctype="multipart/form-data" id="upload-form">
+                    <input class="file-input" id="file" type="file" name="file" accept=".xlsx,.xls" required>
+                    <label class="file-drop file-drop--landing" for="file">
+                        <span class="file-drop-badge">XL</span>
+                        <span class="file-drop-title">Excel dosyasini sec</span>
+                        <span class="file-name" id="file-name">Henuz dosya secilmedi.</span>
+                        <span class="helper-text">Desteklenen bicimler: .xlsx ve .xls</span>
+                    </label>
+                    <div class="landing-actions">
+                        <button class="button-primary button-primary--wide" id="submit-button" type="submit">Analizi baslat</button>
+                        <p class="landing-note">Ilk iki sutun `Kategori` ve `Parametre` olmali.</p>
+                    </div>
+                </form>
+            </article>
+
+            <article class="landing-card landing-card--manual">
+                <div class="landing-copy">
+                    <span class="landing-kicker">Manuel Veri Olustur</span>
+                    <h2 class="landing-title landing-title--compact">Excel olmadan basla</h2>
+                    <p class="landing-text">Kullanici once tarihleri ve satirlari girsin, sistem ayni formatta Excel olusturup analizi calistirsin.</p>
+                    <div class="landing-tags">
+                        <span class="landing-tag">Tarih ekle</span>
+                        <span class="landing-tag">Satir ekle</span>
+                        <span class="landing-tag">Excel otomatik olussun</span>
+                    </div>
                 </div>
-            </form>
-        </article>
+
+                <form class="manual-form" action="/analyze-manual" method="post" id="manual-form">
+                    <input type="hidden" name="manual_payload" id="manual-payload">
+
+                    <div class="manual-toolbar">
+                        <label class="field-group">
+                            <span class="field-label">Olusacak Excel adi</span>
+                            <input class="field-input" id="manual-filename" type="text" value="manuel_veri" placeholder="manuel_veri">
+                        </label>
+                        <div class="manual-toolbar-actions">
+                            <button class="button-secondary" type="button" id="add-date-button">Tarih ekle</button>
+                            <button class="button-secondary" type="button" id="add-row-button">Satir ekle</button>
+                        </div>
+                    </div>
+
+                    <section class="manual-section">
+                        <div class="manual-section-head">
+                            <div>
+                                <h3>Tarih kolonlari</h3>
+                                <p>Exceldeki tarih kolonlarini burada olustur.</p>
+                            </div>
+                        </div>
+                        <div class="manual-date-list" id="manual-date-list"></div>
+                    </section>
+
+                    <section class="manual-section">
+                        <div class="manual-section-head">
+                            <div>
+                                <h3>Veri satirlari</h3>
+                                <p>Kategori ve parametre gir, tarih bazli degerleri doldur.</p>
+                            </div>
+                        </div>
+                        <div class="manual-table-wrap">
+                            <table class="manual-table">
+                                <thead>
+                                    <tr>
+                                        <th>Kategori</th>
+                                        <th>Parametre</th>
+                                        <th class="manual-date-head">Degerler</th>
+                                        <th>Satir</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="manual-table-body"></tbody>
+                            </table>
+                        </div>
+                        <p class="manual-hint">Yuzdeli parametrelerde `4` girersen sistem bunu `%4` olarak kaydeder.</p>
+                    </section>
+
+                    <div class="landing-actions">
+                        <button class="button-primary button-primary--wide" id="manual-submit-button" type="submit">Veriyi olustur ve analiz et</button>
+                        <p class="landing-note">Analiz sonunda istersen olusan Excel dosyasini indirip tekrar kullanabilirsin.</p>
+                    </div>
+                </form>
+            </article>
+        </div>
     </section>
 
     <script>
@@ -40,6 +108,263 @@
         const fileName = document.getElementById("file-name");
         const submitButton = document.getElementById("submit-button");
         const uploadForm = document.getElementById("upload-form");
+
+        const manualForm = document.getElementById("manual-form");
+        const manualPayloadInput = document.getElementById("manual-payload");
+        const manualSubmitButton = document.getElementById("manual-submit-button");
+        const manualFilenameInput = document.getElementById("manual-filename");
+        const addDateButton = document.getElementById("add-date-button");
+        const addRowButton = document.getElementById("add-row-button");
+        const manualDateList = document.getElementById("manual-date-list");
+        const manualTableBody = document.getElementById("manual-table-body");
+
+        const categoryOptions = ["ISG", "Kalite", "Uretim", "Planlama"];
+        let manualDateCounter = 0;
+        let manualRowCounter = 0;
+
+        function formatDateLabel(value) {
+            if (!value) return "Tarih sec";
+            const parsed = new Date(`${value}T00:00:00`);
+            if (Number.isNaN(parsed.getTime())) return value;
+            return parsed.toLocaleDateString("tr-TR", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+            });
+        }
+
+        function toDateInputValue(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, "0");
+            const day = String(date.getDate()).padStart(2, "0");
+            return `${year}-${month}-${day}`;
+        }
+
+        function getDateEntries() {
+            return Array.from(manualDateList.querySelectorAll("[data-date-item]")).map((item) => {
+                const input = item.querySelector("input");
+                return {
+                    id: item.dataset.dateId,
+                    value: input ? input.value : "",
+                };
+            });
+        }
+
+        function getRowValueMap(row) {
+            const values = {};
+            row.querySelectorAll("[data-date-id]").forEach((input) => {
+                values[input.dataset.dateId] = input.value;
+            });
+            return values;
+        }
+
+        function updateDateLabels() {
+            manualDateList.querySelectorAll("[data-date-item]").forEach((item) => {
+                const input = item.querySelector("input");
+                const label = item.querySelector("[data-date-label]");
+                if (label) {
+                    label.textContent = formatDateLabel(input ? input.value : "");
+                }
+            });
+        }
+
+        function renderRowDateCells(row) {
+            const existingValues = getRowValueMap(row);
+            row.querySelectorAll(".manual-date-cell").forEach((cell) => cell.remove());
+
+            const dateEntries = getDateEntries();
+            const parameterInput = row.querySelector("[data-field='parameter']");
+            const parameterText = parameterInput ? parameterInput.value : "";
+            const placeholder = parameterText.includes("%") ? "4" : "Deger";
+
+            const actionCell = row.querySelector(".manual-action-cell");
+            dateEntries.forEach((entry) => {
+                const cell = document.createElement("td");
+                cell.className = "manual-date-cell";
+
+                const input = document.createElement("input");
+                input.type = "text";
+                input.className = "field-input field-input--table";
+                input.placeholder = placeholder;
+                input.dataset.dateId = entry.id;
+                input.value = existingValues[entry.id] || "";
+
+                cell.appendChild(input);
+                row.insertBefore(cell, actionCell);
+            });
+        }
+
+        function renderTableHeader() {
+            const headRow = document.querySelector(".manual-table thead tr");
+            headRow.querySelectorAll(".manual-date-head").forEach((cell) => cell.remove());
+
+            const dateEntries = getDateEntries();
+            const actionHead = headRow.lastElementChild;
+
+            if (!dateEntries.length) {
+                const emptyHead = document.createElement("th");
+                emptyHead.className = "manual-date-head";
+                emptyHead.textContent = "Degerler";
+                headRow.insertBefore(emptyHead, actionHead);
+            } else {
+                dateEntries.forEach((entry) => {
+                    const headCell = document.createElement("th");
+                    headCell.className = "manual-date-head";
+                    headCell.textContent = formatDateLabel(entry.value);
+                    headRow.insertBefore(headCell, actionHead);
+                });
+            }
+        }
+
+        function refreshManualTable() {
+            updateDateLabels();
+            renderTableHeader();
+            Array.from(manualTableBody.querySelectorAll("[data-row-item]")).forEach((row) => {
+                renderRowDateCells(row);
+            });
+        }
+
+        function createDateItem(value = "") {
+            manualDateCounter += 1;
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "manual-date-item";
+            wrapper.dataset.dateItem = "true";
+            wrapper.dataset.dateId = `date-${manualDateCounter}`;
+
+            const label = document.createElement("span");
+            label.className = "manual-date-label";
+            label.dataset.dateLabel = "true";
+            label.textContent = formatDateLabel(value);
+
+            const input = document.createElement("input");
+            input.type = "date";
+            input.className = "field-input";
+            input.value = value;
+
+            const removeButton = document.createElement("button");
+            removeButton.type = "button";
+            removeButton.className = "icon-button";
+            removeButton.textContent = "Sil";
+
+            removeButton.addEventListener("click", () => {
+                wrapper.remove();
+                refreshManualTable();
+            });
+
+            input.addEventListener("input", refreshManualTable);
+            input.addEventListener("change", refreshManualTable);
+
+            wrapper.append(label, input, removeButton);
+            manualDateList.appendChild(wrapper);
+            refreshManualTable();
+        }
+
+        function createCategorySelect(selectedValue = "") {
+            const select = document.createElement("select");
+            select.className = "field-input field-input--table";
+            select.dataset.field = "category";
+
+            const emptyOption = document.createElement("option");
+            emptyOption.value = "";
+            emptyOption.textContent = "Kategori sec";
+            select.appendChild(emptyOption);
+
+            categoryOptions.forEach((optionValue) => {
+                const option = document.createElement("option");
+                option.value = optionValue;
+                option.textContent = optionValue;
+                if (optionValue === selectedValue) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+
+            return select;
+        }
+
+        function createRow(defaults = {}) {
+            manualRowCounter += 1;
+
+            const row = document.createElement("tr");
+            row.dataset.rowItem = "true";
+            row.dataset.rowId = `row-${manualRowCounter}`;
+
+            const categoryCell = document.createElement("td");
+            categoryCell.appendChild(createCategorySelect(defaults.category || ""));
+
+            const parameterCell = document.createElement("td");
+            const parameterInput = document.createElement("input");
+            parameterInput.type = "text";
+            parameterInput.className = "field-input field-input--table";
+            parameterInput.placeholder = "Orn. Bronz Hurda %";
+            parameterInput.value = defaults.parameter || "";
+            parameterInput.dataset.field = "parameter";
+            parameterInput.addEventListener("input", () => renderRowDateCells(row));
+            parameterCell.appendChild(parameterInput);
+
+            const actionCell = document.createElement("td");
+            actionCell.className = "manual-action-cell";
+
+            const removeButton = document.createElement("button");
+            removeButton.type = "button";
+            removeButton.className = "icon-button icon-button--danger";
+            removeButton.textContent = "Satiri sil";
+            removeButton.addEventListener("click", () => row.remove());
+            actionCell.appendChild(removeButton);
+
+            row.append(categoryCell, parameterCell, actionCell);
+            manualTableBody.appendChild(row);
+            renderRowDateCells(row);
+        }
+
+        function getManualRows() {
+            const dateEntries = getDateEntries();
+            return Array.from(manualTableBody.querySelectorAll("[data-row-item]")).map((row) => {
+                const category = row.querySelector("[data-field='category']").value;
+                const parameter = row.querySelector("[data-field='parameter']").value;
+                const values = {};
+
+                dateEntries.forEach((entry) => {
+                    const input = row.querySelector(`[data-date-id='${entry.id}']`);
+                    values[entry.value] = input ? input.value : "";
+                });
+
+                return {
+                    category,
+                    parameter,
+                    values,
+                };
+            });
+        }
+
+        function validateManualForm() {
+            const dateEntries = getDateEntries();
+            const filledDates = dateEntries.map((entry) => entry.value).filter(Boolean);
+            const uniqueDates = new Set(filledDates);
+
+            if (!filledDates.length) {
+                window.alert("Analiz icin en az bir tarih eklemelisin.");
+                return false;
+            }
+
+            if (uniqueDates.size !== filledDates.length) {
+                window.alert("Ayni tarihi birden fazla kez girmeyin.");
+                return false;
+            }
+
+            const hasAnyContent = getManualRows().some((row) => {
+                const hasValues = Object.values(row.values).some((value) => String(value || "").trim());
+                return row.category || row.parameter || hasValues;
+            });
+
+            if (!hasAnyContent) {
+                window.alert("Analiz icin en az bir veri satiri girmelisin.");
+                return false;
+            }
+
+            return true;
+        }
 
         fileInput.addEventListener("change", () => {
             const selected = fileInput.files && fileInput.files.length ? fileInput.files[0].name : "Henuz dosya secilmedi.";
@@ -50,5 +375,33 @@
             submitButton.disabled = true;
             submitButton.textContent = "Analiz hazirlaniyor...";
         });
+
+        addDateButton.addEventListener("click", () => createDateItem(""));
+        addRowButton.addEventListener("click", () => createRow({}));
+
+        manualForm.addEventListener("submit", (event) => {
+            if (!validateManualForm()) {
+                event.preventDefault();
+                return;
+            }
+
+            manualPayloadInput.value = JSON.stringify({
+                filename: manualFilenameInput.value.trim(),
+                dates: getDateEntries().map((entry) => entry.value),
+                rows: getManualRows(),
+            });
+
+            manualSubmitButton.disabled = true;
+            manualSubmitButton.textContent = "Excel olusturuluyor...";
+        });
+
+        const today = new Date();
+        const yesterday = new Date();
+        yesterday.setDate(today.getDate() - 1);
+
+        createDateItem(toDateInputValue(yesterday));
+        createDateItem(toDateInputValue(today));
+        createRow({});
+        refreshManualTable();
     </script>
 {% endblock %}

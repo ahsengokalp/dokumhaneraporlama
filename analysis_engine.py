@@ -80,9 +80,10 @@ def infer_unit(parametre):
 def normalize_percent_value(value, parametre):
     if pd.isna(value):
         return value
+    numeric_value = float(value)
     if infer_unit(parametre) != "%":
-        return float(value)
-    return float(value)
+        return numeric_value
+    return numeric_value * 100
 
 
 def to_display_number(value, decimals=1):
@@ -127,10 +128,11 @@ def format_excel_cell_value(value, number_format, parametre=None):
     unit = infer_unit(parametre) if parametre else None
 
     if any(token in format_text for token in ("0", "#")):
+        if unit == "%":
+            return f"{to_display_number(float(value) * 100, decimals=1)}%"
+
         numeric_value = quantize_decimal(float(value), decimals)
         display_value = f"{numeric_value:.{decimals}f}" if decimals > 0 else str(int(numeric_value))
-        if unit == "%":
-            return f"{display_value}%"
         if unit == "T":
             return f"{display_value}T"
         if unit == "kg":
@@ -141,7 +143,7 @@ def format_excel_cell_value(value, number_format, parametre=None):
 
     numeric_value = pd.to_numeric(value, errors="coerce")
     if not pd.isna(numeric_value) and unit == "%":
-        return f"{to_display_number(float(numeric_value), decimals=1)}%"
+        return f"{to_display_number(float(numeric_value) * 100, decimals=1)}%"
 
     return str(value)
 
@@ -581,6 +583,8 @@ def build_highlight_actions(actions):
 
 def scale_series_for_chart(series, parametre):
     unit = infer_unit(parametre)
+    if unit == "%":
+        return series.astype(float) * 100, unit
     return series, unit
 
 
