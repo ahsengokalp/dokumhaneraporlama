@@ -10,13 +10,13 @@
             <header class="landing-hero-simple">
                 <span class="landing-kicker">Uretim Toplanti Asistani</span>
                 <h1 class="landing-title landing-title--simple">Sabah toplantisina veri hazirla</h1>
-                <p class="landing-text landing-text--simple">Mevcut Excel dosyasini yukleyebilir ya da veriyi burada girip dogrudan analiz ve kayit akisini kullanabilirsin.</p>
+                <p class="landing-text landing-text--simple">Disaridan Excel yukleyebilir ya da veriyi burada girebilirsin. Excel yukleme sadece veri satirlarini doldurur; analiz ve kayit her zaman bu tablo uzerinden ilerler.</p>
             </header>
 
             <article class="entry-panel entry-panel--upload">
                 <div class="entry-panel-head">
                     <div>
-                        <h2>Excel ile devam et</h2>
+                        <h2>Excel ile veri aktar</h2>
                         <p>Hazir dosyan varsa sec; sistem verileri asagidaki veri satirlari alanina otomatik aktarsin.</p>
                     </div>
                 </div>
@@ -28,7 +28,7 @@
                         <span class="file-name file-name--inline" id="file-name">Henuz dosya secilmedi.</span>
                     </div>
                     <div class="landing-actions landing-actions--inline">
-                        <p class="landing-note">Beklenen yapi: `Veriler` sayfasi, ilk iki sutun `Kategori` ve `Parametre`. Secilen dosya veri satirlarini otomatik doldurur.</p>
+                        <p class="landing-note">Beklenen yapi: `Veriler` sayfasi, ilk iki sutun `Kategori` ve `Parametre`. Secilen dosya sadece veri satirlarini otomatik doldurur.</p>
                     </div>
                     <p class="manual-hint" id="upload-status">Bir Excel sectiginde veri satirlari bolumu otomatik dolar.</p>
                 </div>
@@ -39,9 +39,7 @@
                     <div>
                         <h2>Veriyi burada olustur</h2>
                         <p>Excel olmadan basla. Tarihleri ve satirlari gir, sistem veriyi analiz edip veri tabanina kaydetsin.</p>
-                        {% if template_name %}
-                            <p class="entry-panel-note">Sablon: {{ template_name }}. Parametre listesi bu ornekten geliyor; girdigin manuel veriler PostgreSQL veri tabanina kaydedilir.</p>
-                        {% endif %}
+                        <p class="entry-panel-note">{{ template_note }}</p>
                     </div>
                 </div>
 

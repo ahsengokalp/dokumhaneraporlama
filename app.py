@@ -3,18 +3,17 @@ import os
 import re
 from html import escape
 from datetime import date
-from glob import glob
 
 import pandas as pd
 from flask import Flask, jsonify, render_template, request
-from openpyxl import load_workbook
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
-from analysis_engine import analyze_excel_file, analyze_raw_dataframe, infer_unit
+from analysis_engine import analyze_raw_dataframe, infer_unit
 from manual_entry_store import (
     delete_manual_submission,
     get_manual_submission_payload,
+    list_manual_template_rows,
     list_recent_manual_submissions,
     save_manual_submission,
 )
@@ -28,13 +27,6 @@ from ollama_client import (
 load_dotenv()
 
 app = Flask(__name__)
-app.config["UPLOAD_FOLDER"] = "uploads"
-os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-
-MANUAL_TEMPLATE_PATTERNS = [
-    r"C:\Users\bt.stajyer\OneDrive - Dikkan Gemi ve Endustriyel Vana Sanayi Ticaret A.S\Masa*\ahsen\Sabah Top*.xlsx",
-    os.path.join(os.path.dirname(__file__), "uploads", "Sabah*.xlsx"),
-]
 
 
 TR_MONTHS = {
@@ -146,18 +138,11 @@ def render_ai_comment_html(text):
     return "".join(parts)
 
 
-def find_manual_template_path():
-    for pattern in MANUAL_TEMPLATE_PATTERNS:
-        matches = sorted(glob(pattern))
-        if matches:
-            return matches[0]
-    return None
-
-
-def load_manual_template_config():
-    template_path = find_manual_template_path()
+def build_manual_template_config(ordered_rows, template_name=None, source="database"):
     config = {
-        "path": template_path,
+        "path": None,
+        "source": source,
+        "template_name": template_name,
         "categories": [],
         "parameters_by_category": {},
         "row_index_map": {},
@@ -165,44 +150,47 @@ def load_manual_template_config():
         "date_column_count": 0,
     }
 
-    if not template_path:
+    if not ordered_rows:
         return config
-
-    workbook = load_workbook(template_path, data_only=False)
-    worksheet = workbook["Veriler"]
-    config["date_column_count"] = max(0, worksheet.max_column - 2)
 
     categories = []
     parameters_by_category = {}
     row_index_map = {}
-    ordered_rows = []
+    normalized_rows = []
 
-    for row_index in range(2, worksheet.max_row + 1):
-        category = worksheet.cell(row=row_index, column=1).value
-        parameter = worksheet.cell(row=row_index, column=2).value
-        if not category or not parameter:
+    for row_index, row in enumerate(ordered_rows, start=2):
+        category_text = str(row.get("category") or "").strip()
+        parameter_text = str(row.get("parameter") or "").strip()
+        if not category_text or not parameter_text:
             continue
-
-        category_text = str(category).strip()
-        parameter_text = str(parameter).strip()
-
         if category_text not in categories:
             categories.append(category_text)
         parameters_by_category.setdefault(category_text, []).append(parameter_text)
         row_index_map[(category_text, parameter_text)] = row_index
-        ordered_rows.append(
+        normalized_rows.append(
             {
                 "category": category_text,
                 "parameter": parameter_text,
             }
         )
 
-    workbook.close()
     config["categories"] = categories
     config["parameters_by_category"] = parameters_by_category
     config["row_index_map"] = row_index_map
-    config["ordered_rows"] = ordered_rows
+    config["ordered_rows"] = normalized_rows
     return config
+
+
+def load_manual_template_config():
+    db_result = list_manual_template_rows()
+    if db_result.get("ok") and db_result.get("rows"):
+        return build_manual_template_config(
+            db_result["rows"],
+            template_name="Veri tabani sabit satirlari",
+            source="database",
+        )
+
+    return build_manual_template_config([], template_name=None, source="database")
 
 
 MANUAL_TEMPLATE_CONFIG = load_manual_template_config()
@@ -435,12 +423,15 @@ def render_analysis_result(result, source_name=None, source_kind="Excel yukleme"
 @app.route("/", methods=["GET"])
 def home():
     history_result = list_recent_manual_submissions(limit=8)
+    if MANUAL_TEMPLATE_CONFIG["ordered_rows"]:
+        template_note = "Sabit satir yapisi veri tabanindan okunur; manuel girisler de dogrudan PostgreSQL veri tabanina kaydedilir."
+    else:
+        template_note = "Sabit satir yapisi henuz veri tabaninda tanimli degil. Bu nedenle manuel tablo satirlari listelenemiyor."
+
     return render_template(
         "index.html",
-        template_categories=MANUAL_TEMPLATE_CONFIG["categories"],
-        template_parameters=MANUAL_TEMPLATE_CONFIG["parameters_by_category"],
         template_rows=MANUAL_TEMPLATE_CONFIG["ordered_rows"],
-        template_name=os.path.basename(MANUAL_TEMPLATE_CONFIG["path"]) if MANUAL_TEMPLATE_CONFIG["path"] else None,
+        template_note=template_note,
         manual_history=history_result.get("records", []),
         manual_history_error=None if history_result.get("ok") else history_result.get("message"),
     )
@@ -495,42 +486,6 @@ def get_manual_submission(submission_id):
     return jsonify(result)
 
 
-@app.route("/analyze", methods=["POST"])
-def analyze():
-    if "file" not in request.files:
-        return render_template(
-            "error.html",
-            title="Dosya bulunamadi",
-            message="Analizi baslatmak icin once bir Excel dosyasi yukleyin.",
-            detail="Desteklenen bicimler: .xlsx ve .xls",
-        ), 400
-
-    file = request.files["file"]
-
-    if file.filename == "":
-        return render_template(
-            "error.html",
-            title="Dosya secilmedi",
-            message="Devam edebilmek icin analiz etmek istediginiz Excel dosyasini secin.",
-            detail="Ilk iki sutun Kategori ve Parametre, diger sutunlar tarih olmali.",
-        ), 400
-
-    filename = secure_filename(file.filename)
-    filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-    file.save(filepath)
-
-    try:
-        result = analyze_excel_file(filepath)
-        return render_analysis_result(result, source_name=filename, source_kind="Excel yukleme")
-    except Exception as exc:
-        return render_template(
-            "error.html",
-            title="Analiz tamamlanamadi",
-            message="Dosya yuklendi ancak veriler beklenen yapida islenemedi.",
-            detail=str(exc),
-        ), 500
-
-
 @app.route("/analyze-manual", methods=["POST"])
 def analyze_manual():
     payload_text = request.form.get("manual_payload", "")
@@ -549,7 +504,7 @@ def analyze_manual():
             raw_df,
             payload_text,
             submission_name=preferred_name or "manuel_giris",
-            template_name=os.path.basename(MANUAL_TEMPLATE_CONFIG["path"]) if MANUAL_TEMPLATE_CONFIG["path"] else None,
+            template_name=MANUAL_TEMPLATE_CONFIG.get("template_name"),
             result=result,
         )
         return render_analysis_result(

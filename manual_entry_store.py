@@ -6,6 +6,7 @@ from uuid import UUID
 from uuid import uuid4
 
 import pandas as pd
+from dotenv import load_dotenv
 
 from analysis_engine import infer_unit
 
@@ -22,6 +23,8 @@ class ManualEntryStoreError(Exception):
 
 
 _TABLES_READY = False
+
+load_dotenv()
 
 
 def _get_db_settings():
@@ -44,6 +47,29 @@ def _ensure_tables(connection):
         return
 
     with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS manual_data_template_rows (
+                id BIGSERIAL PRIMARY KEY,
+                row_order INTEGER NOT NULL,
+                kategori TEXT NOT NULL,
+                parametre TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_manual_data_template_rows_order
+            ON manual_data_template_rows (row_order)
+            """
+        )
+        cursor.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_manual_data_template_rows_pair
+            ON manual_data_template_rows (kategori, parametre)
+            """
+        )
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS manual_data_submissions (
@@ -111,6 +137,149 @@ def _ensure_tables(connection):
         )
 
     _TABLES_READY = True
+
+
+def _normalize_template_rows(rows):
+    normalized_rows = []
+    seen_pairs = set()
+
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+
+        category = str(row.get("category") or row.get("kategori") or "").strip()
+        parameter = str(row.get("parameter") or row.get("parametre") or "").strip()
+        if not category or not parameter:
+            continue
+
+        pair_key = (category, parameter)
+        if pair_key in seen_pairs:
+            continue
+
+        seen_pairs.add(pair_key)
+        normalized_rows.append(
+            {
+                "row_order": len(normalized_rows) + 1,
+                "category": category,
+                "parameter": parameter,
+            }
+        )
+
+    return normalized_rows
+
+
+def list_manual_template_rows():
+    if psycopg is None:
+        return {
+            "ok": False,
+            "message": "Sabit satirlar okunamadi: 'psycopg' paketi kurulu degil.",
+            "rows": [],
+        }
+
+    settings = _get_db_settings()
+    missing_keys = _missing_db_keys(settings)
+    if missing_keys:
+        return {
+            "ok": False,
+            "message": f"Sabit satirlar okunamadi: eksik ortam degiskenleri {', '.join(missing_keys)}.",
+            "rows": [],
+        }
+
+    try:
+        with psycopg.connect(**settings) as connection:
+            _ensure_tables(connection)
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT row_order, kategori, parametre
+                    FROM manual_data_template_rows
+                    ORDER BY row_order ASC, id ASC
+                    """
+                )
+                rows = cursor.fetchall()
+    except Exception as exc:
+        return {
+            "ok": False,
+            "message": f"Sabit satirlar okunamadi: {exc}",
+            "rows": [],
+        }
+
+    return {
+        "ok": True,
+        "rows": [
+            {
+                "row_order": row[0],
+                "category": row[1],
+                "parameter": row[2],
+            }
+            for row in rows
+        ],
+    }
+
+
+def seed_manual_template_rows(rows):
+    if psycopg is None:
+        return {
+            "ok": False,
+            "message": "Sabit satirlar veri tabanina yazilamadi: 'psycopg' paketi kurulu degil.",
+            "row_count": 0,
+        }
+
+    settings = _get_db_settings()
+    missing_keys = _missing_db_keys(settings)
+    if missing_keys:
+        return {
+            "ok": False,
+            "message": f"Sabit satirlar veri tabanina yazilamadi: eksik ortam degiskenleri {', '.join(missing_keys)}.",
+            "row_count": 0,
+        }
+
+    normalized_rows = _normalize_template_rows(rows)
+    if not normalized_rows:
+        return {
+            "ok": False,
+            "message": "Sabit satir listesi bos oldugu icin veri tabanina yazilamadi.",
+            "row_count": 0,
+        }
+
+    try:
+        with psycopg.connect(**settings) as connection:
+            _ensure_tables(connection)
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) FROM manual_data_template_rows")
+                existing_count = int(cursor.fetchone()[0] or 0)
+                if existing_count > 0:
+                    return {
+                        "ok": True,
+                        "message": "Sabit satirlar zaten veri tabaninda mevcut.",
+                        "row_count": existing_count,
+                        "seeded": False,
+                    }
+
+                cursor.executemany(
+                    """
+                    INSERT INTO manual_data_template_rows (row_order, kategori, parametre)
+                    VALUES (%s, %s, %s)
+                    """,
+                    [
+                        (row["row_order"], row["category"], row["parameter"])
+                        for row in normalized_rows
+                    ],
+                )
+            connection.commit()
+    except Exception as exc:
+        return {
+            "ok": False,
+            "message": f"Sabit satirlar veri tabanina yazilamadi: {exc}",
+            "row_count": 0,
+        }
+
+    return {
+        "ok": True,
+        "message": "Sabit satirlar veri tabanina yazildi.",
+        "row_count": len(normalized_rows),
+        "seeded": True,
+    }
 
 
 def save_manual_submission(raw_df, payload_text, submission_name, template_name=None, result=None):
