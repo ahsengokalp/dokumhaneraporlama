@@ -10,14 +10,12 @@
             <header class="landing-hero-simple">
                 <span class="landing-kicker">Uretim Toplanti Asistani</span>
                 <h1 class="landing-title landing-title--simple">Sabah toplantisina veri hazirla</h1>
-                <p class="landing-text landing-text--simple">Disaridan Excel yukleyebilir ya da veriyi burada girebilirsin. Excel yukleme sadece veri satirlarini doldurur; analiz ve kayit her zaman bu tablo uzerinden ilerler.</p>
             </header>
 
             <article class="entry-panel entry-panel--upload">
                 <div class="entry-panel-head">
                     <div>
                         <h2>Excel ile veri aktar</h2>
-                        <p>Hazir dosyan varsa sec; sistem verileri asagidaki veri satirlari alanina otomatik aktarsin.</p>
                     </div>
                 </div>
 
@@ -27,10 +25,7 @@
                         <label class="button-secondary button-secondary--file" for="file">Excel dosyasini sec</label>
                         <span class="file-name file-name--inline" id="file-name">Henuz dosya secilmedi.</span>
                     </div>
-                    <div class="landing-actions landing-actions--inline">
-                        <p class="landing-note">Beklenen yapi: `Veriler` sayfasi, ilk iki sutun `Kategori` ve `Parametre`. Secilen dosya sadece veri satirlarini otomatik doldurur.</p>
-                    </div>
-                    <p class="manual-hint" id="upload-status">Bir Excel sectiginde veri satirlari bolumu otomatik dolar.</p>
+                    <p class="manual-hint" id="upload-status" hidden></p>
                 </div>
             </article>
 
@@ -38,8 +33,9 @@
                 <div class="entry-panel-head">
                     <div>
                         <h2>Veriyi burada olustur</h2>
-                        <p>Excel olmadan basla. Tarihleri ve satirlari gir, sistem veriyi analiz edip veri tabanina kaydetsin.</p>
-                        <p class="entry-panel-note">{{ template_note }}</p>
+                        {% if not template_rows %}
+                            <p class="entry-panel-note">{{ template_note }}</p>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -89,7 +85,7 @@
                                 <tbody id="manual-table-body"></tbody>
                             </table>
                         </div>
-                        <p class="manual-hint">Yuzdeli parametrelerde `4` girersen sistem bunu `%4` olarak kaydeder. Tablo alanini fareyle tutup saga sola ya da asagi yukari kaydirabilirsin.</p>
+                        <p class="manual-hint">Yuzdeli parametrelerde `4` girersen sistem bunu `%4` olarak kaydeder. Ok tuslariyla hucreler arasinda gezebilir, tablo alanini fareyle tutup saga sola ya da asagi yukari kaydirabilirsin.</p>
                     </section>
 
                     <div class="landing-actions landing-actions--inline">
@@ -103,7 +99,6 @@
                 <div class="entry-panel-head">
                     <div>
                         <h2>Kayitli tablolar</h2>
-                        <p>Daha once kaydettigin manuel girisleri burada gorup forma geri yukleyebilirsin.</p>
                         {% if manual_history_error %}
                             <p class="entry-panel-note entry-panel-note--warning">{{ manual_history_error }}</p>
                         {% endif %}
@@ -311,6 +306,53 @@
             Array.from(manualTableBody.querySelectorAll("[data-row-item]")).forEach((row) => {
                 renderRowDateCells(row);
             });
+            updateTableInputNavigationMap();
+        }
+
+        function updateTableInputNavigationMap() {
+            const rows = Array.from(manualTableBody.querySelectorAll("[data-row-item]"));
+            rows.forEach((row, rowIndex) => {
+                row.dataset.gridRow = String(rowIndex);
+                const inputs = Array.from(row.querySelectorAll(".manual-date-cell .field-input--table"));
+                inputs.forEach((input, colIndex) => {
+                    input.dataset.gridRow = String(rowIndex);
+                    input.dataset.gridCol = String(colIndex);
+                });
+            });
+        }
+
+        function focusTableInput(rowIndex, colIndex) {
+            if (rowIndex < 0 || colIndex < 0) {
+                return false;
+            }
+
+            const nextInput = manualTableBody.querySelector(
+                `.field-input--table[data-grid-row='${rowIndex}'][data-grid-col='${colIndex}']`,
+            );
+            if (!nextInput) {
+                return false;
+            }
+
+            nextInput.focus();
+            nextInput.select();
+            nextInput.scrollIntoView({ block: "nearest", inline: "nearest" });
+            return true;
+        }
+
+        function shouldMoveHorizontal(input, direction) {
+            const start = typeof input.selectionStart === "number" ? input.selectionStart : 0;
+            const end = typeof input.selectionEnd === "number" ? input.selectionEnd : 0;
+            const length = input.value.length;
+
+            if (direction === "left") {
+                return start === 0 && end === 0;
+            }
+
+            if (direction === "right") {
+                return start === length && end === length;
+            }
+
+            return false;
         }
 
         function clearDateItems() {
@@ -571,7 +613,7 @@
                 }
 
                 populateManualFormFromPayload(data.payload, data.source_name || selectedFile.name, false);
-                setUploadStatus(`${data.source_name || selectedFile.name} veri satirlarina aktarıldi. Dilersen duzenleyip analiz edebilirsin.`, "success");
+                setUploadStatus(`${data.source_name || selectedFile.name} veri satirlarina aktarildi. Dilersen duzenleyip analiz edebilirsin.`, "success");
             } catch (error) {
                 setUploadStatus(error.message || "Excel forma aktarilamadi.", "warning");
             } finally {
@@ -629,6 +671,31 @@
             manualSubmitInProgress = true;
             manualSubmitButton.disabled = true;
             manualSubmitButton.textContent = "Analiz hazirlaniyor...";
+        });
+
+        manualTableBody.addEventListener("keydown", (event) => {
+            const input = event.target.closest(".field-input--table");
+            if (!input) {
+                return;
+            }
+
+            const rowIndex = Number(input.dataset.gridRow);
+            const colIndex = Number(input.dataset.gridCol);
+            let handled = false;
+
+            if (event.key === "ArrowUp") {
+                handled = focusTableInput(rowIndex - 1, colIndex);
+            } else if (event.key === "ArrowDown") {
+                handled = focusTableInput(rowIndex + 1, colIndex);
+            } else if (event.key === "ArrowLeft" && shouldMoveHorizontal(input, "left")) {
+                handled = focusTableInput(rowIndex, colIndex - 1);
+            } else if (event.key === "ArrowRight" && shouldMoveHorizontal(input, "right")) {
+                handled = focusTableInput(rowIndex, colIndex + 1);
+            }
+
+            if (handled) {
+                event.preventDefault();
+            }
         });
 
         window.addEventListener("pageshow", () => {

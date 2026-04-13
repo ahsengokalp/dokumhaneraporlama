@@ -124,45 +124,6 @@
         </aside>
 
         <section class="content-stack">
-            <article class="card-shell">
-                <div class="card-head">
-                    <div>
-                        <h2>Genel Sonuc</h2>
-                        <p>Sunum mantigindaki ozet, cikarim ve trend akisi.</p>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="summary-strip">
-                        <div class="summary-box">
-                            <span>Parametre</span>
-                            <strong>{{ parameter_summaries|length }}</strong>
-                        </div>
-                        <div class="summary-box">
-                            <span>Cikarim</span>
-                            <strong>{{ actions|length }}</strong>
-                        </div>
-                        <div class="summary-box">
-                            <span>Trend</span>
-                            <strong>{{ charts|length }}</strong>
-                        </div>
-                    <div class="summary-box">
-                        <span>AI</span>
-                        <strong>{% if ai_comment %}Hazir{% else %}Yok{% endif %}</strong>
-                    </div>
-                </div>
-                    {% if persistence_result %}
-                        <div class="notice-panel {% if persistence_result.ok %}notice-panel--ai{% else %}notice-panel--warning{% endif %}">
-                            {{ persistence_result.message }}
-                            {% if persistence_result.submission_id %}
-                                <br>
-                                Kayit ID: {{ persistence_result.submission_id }}
-                            {% endif %}
-                        </div>
-                    {% endif %}
-                    <div class="notice-panel accent-panel">{{ info_text }}</div>
-                </div>
-            </article>
-
             <div class="tab-pane is-active" data-section-panel="review">
                 <article class="card-shell">
                     <div class="card-head">
@@ -173,6 +134,16 @@
                         <span class="pill pill--info">{{ parameter_summaries|length }} parametre</span>
                     </div>
                     <div class="card-body">
+                        {% if persistence_result %}
+                            <div class="notice-panel {% if persistence_result.ok %}notice-panel--ai{% else %}notice-panel--warning{% endif %}">
+                                {{ persistence_result.message }}
+                                {% if persistence_result.submission_id %}
+                                    <br>
+                                    Kayit ID: {{ persistence_result.submission_id }}
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                        <div class="notice-panel accent-panel">{{ info_text }}</div>
                         <div class="filter-bar" data-filter-panel="review">
                             <div class="filter-group">
                                 <label class="filter-label" for="review-category">Kategori</label>
