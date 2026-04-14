@@ -1,11 +1,10 @@
-import os
 import requests
-from dotenv import load_dotenv
 
-load_dotenv()
+from config_loader import get_ollama_settings
 
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL")
+OLLAMA_SETTINGS = get_ollama_settings()
+OLLAMA_BASE_URL = OLLAMA_SETTINGS["base_url"]
+OLLAMA_MODEL = OLLAMA_SETTINGS["model"]
 
 
 FORBIDDEN_AI_TERMS = [

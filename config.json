@@ -1,0 +1,38 @@
+{
+    "database": {
+        "host": "172.16.49.50",
+        "port": 5432,
+        "database": "dokumhanerapor",
+        "user": "dokumhane_user",
+        "password": "5xdfEq55sdvaaJZ8Vqjy4"
+    },
+    "smtp": {
+        "host": "172.16.40.10",
+        "port": 3535,
+        "secure": false,
+        "auth": false,
+        "user": "",
+        "password": "",
+        "from": "Uretim Planlama <uretim-planlama@dikkan.com>",
+        "enabled": false
+    },
+    "ldap": {
+        "server": "172.16.40.1",
+        "port": 389,
+        "base_dn": "dc=dikkan,dc=com",
+        "use_ssl": false
+    },
+    "ollama": {
+        "host": "172.16.41.43",
+        "port": 11434,
+        "model": "gemma4:latest"
+    },
+    "app": {
+        "secret_key": "uretim-planlama-secret-key-change-me",
+        "check_interval_minutes": 5,
+        "similarity_threshold": 70,
+        "debug": false,
+        "host": "0.0.0.0",
+        "port": 5057
+    }
+}

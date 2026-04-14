@@ -1,14 +1,13 @@
 import hashlib
 import json
-import os
 from datetime import date
 from uuid import UUID
 from uuid import uuid4
 
 import pandas as pd
-from dotenv import load_dotenv
 
 from analysis_engine import infer_unit
+from config_loader import get_database_settings
 
 try:
     import psycopg
@@ -24,17 +23,9 @@ class ManualEntryStoreError(Exception):
 
 _TABLES_READY = False
 
-load_dotenv()
-
 
 def _get_db_settings():
-    return {
-        "host": os.getenv("DB_HOST"),
-        "port": os.getenv("DB_PORT"),
-        "dbname": os.getenv("DB_NAME"),
-        "user": os.getenv("DB_USER"),
-        "password": os.getenv("DB_PASS"),
-    }
+    return get_database_settings()
 
 
 def _missing_db_keys(settings):

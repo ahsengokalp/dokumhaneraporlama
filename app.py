@@ -1,5 +1,4 @@
 import json
-import os
 import re
 from html import escape
 from datetime import date
@@ -7,9 +6,9 @@ from datetime import date
 import pandas as pd
 from flask import Flask, jsonify, render_template, request
 from werkzeug.utils import secure_filename
-from dotenv import load_dotenv
 
 from analysis_engine import analyze_raw_dataframe, infer_unit
+from config_loader import get_app_settings
 from manual_entry_store import (
     delete_manual_submission,
     get_manual_submission_payload,
@@ -24,9 +23,10 @@ from ollama_client import (
     is_unusable_ai_comment,
 )
 
-load_dotenv()
+APP_SETTINGS = get_app_settings()
 
 app = Flask(__name__)
+app.secret_key = APP_SETTINGS["secret_key"] or "change-me"
 
 
 TR_MONTHS = {
@@ -530,7 +530,7 @@ def analyze_manual():
 
 if __name__ == "__main__":
     app.run(
-        host=os.getenv("APP_HOST", "0.0.0.0"),
-        port=int(os.getenv("APP_PORT", "5057")),
-        debug=os.getenv("APP_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"},
+        host=APP_SETTINGS["host"],
+        port=APP_SETTINGS["port"],
+        debug=APP_SETTINGS["debug"],
     )
