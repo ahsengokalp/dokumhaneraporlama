@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Uretim Planlama{% endblock %}</title>
+    <title>{% block title %}Dokumhane Raporlama{% endblock %}</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logod.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
     {% block extra_head %}{% endblock %}
@@ -13,8 +13,8 @@
         <div class="brand-wrap">
             <img class="brand-logo" src="{{ url_for('static', filename='logo.png') }}" alt="Dikkan">
             <div class="brand-copy">
-                <div class="brand-title">Uretim</div>
-                <span class="brand-subtitle">{% block topbar_title %}Sabah Toplanti Sistemi{% endblock %}</span>
+                <div class="brand-title">Dokumhane</div>
+                <span class="brand-subtitle">{% block topbar_title %}Raporlama{% endblock %}</span>
             </div>
         </div>
         <nav class="top-actions">
