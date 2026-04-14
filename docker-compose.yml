@@ -1,0 +1,21 @@
+services:
+  uretim-planlama:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: uretim-planlama
+    container_name: uretim-planlama
+    ports:
+      - "5057:5057"
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      APP_HOST: 0.0.0.0
+      APP_PORT: 5057
+      APP_DEBUG: "false"
+    volumes:
+      - uploads_data:/app/uploads
+
+volumes:
+  uploads_data:

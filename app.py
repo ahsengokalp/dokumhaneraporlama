@@ -529,4 +529,8 @@ def analyze_manual():
 
 
 if __name__ == "__main__":
-    app.run(host=os.getenv("APP_HOST", "0.0.0.0"), port=int(os.getenv("APP_PORT", "5053")), debug=True)
+    app.run(
+        host=os.getenv("APP_HOST", "0.0.0.0"),
+        port=int(os.getenv("APP_PORT", "5057")),
+        debug=os.getenv("APP_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"},
+    )
