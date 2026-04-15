@@ -1,15 +1,15 @@
 services:
-  uretim-planlama:
+  dokumhaneraporlama:
     build:
       context: .
       dockerfile: Dockerfile
-    image: uretim-planlama
-    container_name: uretim-planlama
+    image: dokumhaneraporlama
+    container_name: dokumhaneraporlama
     ports:
       - "5057:5057"
-    restart: unless-stopped
+    restart: always
     volumes:
-      - uploads_data:/app/uploads
+      - dokumhaneraporlama:/app/uploads
 
 volumes:
-  uploads_data:
+  dokumhaneraporlama:

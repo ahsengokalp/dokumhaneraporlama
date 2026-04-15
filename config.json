@@ -1,6 +1,6 @@
 {
     "database": {
-        "host": "172.16.49.50",
+        "host": "172.16.49.2",
         "port": 5432,
         "database": "dokumhanerapor",
         "user": "dokumhane_user",
@@ -13,7 +13,7 @@
         "auth": false,
         "user": "",
         "password": "",
-        "from": "Uretim Planlama <uretim-planlama@dikkan.com>",
+        "from": "Dokumhane Raporlama <dokumhane-raporlama@dikkan.com>",
         "enabled": false
     },
     "ldap": {
@@ -28,7 +28,7 @@
         "model": "gemma4:latest"
     },
     "app": {
-        "secret_key": "uretim-planlama-secret-key-change-me",
+        "secret_key": "dokumhaneraporlama-secret-key-change-me",
         "check_interval_minutes": 5,
         "similarity_threshold": 70,
         "debug": false,
